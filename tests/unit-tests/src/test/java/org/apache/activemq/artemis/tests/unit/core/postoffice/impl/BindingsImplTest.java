@@ -393,6 +393,11 @@ public class BindingsImplTest extends ActiveMQTestBase {
       }
 
       @Override
+      public boolean isHighAcceptPriority(final Message message, boolean redistributing) {
+         return false;
+      }
+
+      @Override
       public void route(final Message message, final RoutingContext context) throws Exception {
 
       }
