@@ -1210,10 +1210,8 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
             status = RoutingStatus.NO_BINDINGS;
             ActiveMQServerLogger.LOGGER.noDLA(address);
          } else {
-            message.referenceOriginalMessage(message, null);
-
+            message.referenceOriginalMessage(message, null, true);
             message.setAddress(dlaAddress);
-
             message.reencode();
 
             route(message, new RoutingContextImpl(context.getTransaction()), false, true, null, true);

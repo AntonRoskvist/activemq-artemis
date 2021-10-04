@@ -635,9 +635,9 @@ public class AMQPLargeMessage extends AMQPMessage implements LargeServerMessage 
    }
 
    @Override
-   public void referenceOriginalMessage(final Message original, String originalQueue) {
+   public void referenceOriginalMessage(final Message original, String originalQueue, boolean stripRoutingType) {
 
-      super.referenceOriginalMessage(original, originalQueue);
+      super.referenceOriginalMessage(original, originalQueue, stripRoutingType);
 
       if (original instanceof LargeServerMessageImpl) {
          this.largeBody.referenceOriginalMessage(((AMQPLargeMessage) original).largeBody);

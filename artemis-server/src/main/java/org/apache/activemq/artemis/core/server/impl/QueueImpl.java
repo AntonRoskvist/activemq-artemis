@@ -2675,8 +2675,13 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
 
             String originalMessageAddress = ref.getMessage().getAnnotationString(Message.HDR_ORIGINAL_ADDRESS);
             String originalMessageQueue = ref.getMessage().getAnnotationString(Message.HDR_ORIGINAL_QUEUE);
+            Binding binding = null;
 
-            if (originalMessageAddress != null) {
+            if (originalMessageQueue != null) {
+               binding = postOffice.getBinding(SimpleString.toSimpleString(originalMessageQueue));
+            }
+
+            if (originalMessageAddress != null && binding != null) {
 
                incDelivering(ref);
 
@@ -2684,9 +2689,7 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
                if (originalMessageQueue != null && !originalMessageQueue.equals(originalMessageAddress)) {
                   targetQueue = queues.get(originalMessageQueue);
                   if (targetQueue == null) {
-                     Binding binding = postOffice.getBinding(SimpleString.toSimpleString(originalMessageQueue));
-
-                     if (binding != null && binding instanceof LocalQueueBinding) {
+                     if (binding instanceof LocalQueueBinding) {
                         targetQueue = ((LocalQueueBinding) binding).getID();
                         queues.put(originalMessageQueue, targetQueue);
                      }
@@ -2702,6 +2705,7 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
                return true;
             }
 
+            ActiveMQServerLogger.LOGGER.unableToFindTargetQueue(originalMessageQueue);
             return false;
          }
       });
@@ -3374,6 +3378,10 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
 
       copyMessage.setAddress(toAddress);
 
+      if (copyMessage.getAnnotationString(Message.HDR_ORIG_ROUTING_TYPE) != null) {
+         copyMessage.putByteProperty(Message.HDR_ROUTING_TYPE.toString(), copyMessage.getByteProperty(Message.HDR_ORIG_ROUTING_TYPE));
+      }
+
       if (queueIDs != null && queueIDs.length > 0) {
          ByteBuffer buffer = ByteBuffer.allocate(8 * queueIDs.length);
          for (long id : queueIDs) {
@@ -3526,7 +3534,7 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
       Message copy = message.copy(newID, true);
 
       if (copyOriginalHeaders) {
-         copy.referenceOriginalMessage(message, ref.getQueue().getName().toString());
+         copy.referenceOriginalMessage(message, ref.getQueue().getName().toString(), true);
       }
 
       copy.setExpiration(0);
