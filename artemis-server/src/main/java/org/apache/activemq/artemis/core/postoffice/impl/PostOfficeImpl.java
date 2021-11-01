@@ -305,7 +305,7 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
                SimpleString filterString = props.getSimpleStringProperty(ManagementHelper.HDR_FILTERSTRING);
 
                if (!props.containsProperty(ManagementHelper.HDR_DISTANCE)) {
-                  logger.debug("PostOffice notification / BINDING_ADDED: HDR_DISANCE not specified, giving up propagation on notifications");
+                  logger.debug("PostOffice notification / BINDING_ADDED: HDR_DISTANCE not specified, giving up propagation on notifications");
                   return;
                }
 
@@ -314,6 +314,19 @@ public class PostOfficeImpl implements PostOffice, NotificationListener, Binding
                QueueInfo info = new QueueInfo(routingName, clusterName, address, filterString, id, distance);
 
                queueInfos.put(clusterName, info);
+
+               if (distance < 1) {
+
+                  Binding binding = getBinding(routingName);
+
+                  Queue queue = (Queue) binding.getBindable();
+                  AddressSettings addressSettings = addressSettingsRepository.getMatch(binding.getAddress().toString());
+                  long redistributionDelay = addressSettings.getRedistributionDelay();
+
+                  if (redistributionDelay != -1) {
+                     queue.addRedistributor(redistributionDelay);
+                  }
+               }
 
                break;
             }
