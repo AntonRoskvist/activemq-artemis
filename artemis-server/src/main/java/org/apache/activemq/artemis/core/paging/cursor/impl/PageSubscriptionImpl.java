@@ -1187,7 +1187,7 @@ public final class PageSubscriptionImpl implements PageSubscription {
          }
       }
 
-      private boolean internalAddACK(final PagePosition position) {
+      private synchronized boolean internalAddACK(final PagePosition position) {
          removedReferences.put(position.getMessageNr(), DUMMY);
          return acks.put(position.getMessageNr(), position) == null;
       }
