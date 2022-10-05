@@ -334,6 +334,10 @@ public class PageCursorProviderImpl implements PageCursorProvider {
          }
          depagedPagesSet.add(page.getPageId());
          depagedPages.add(page);
+         if (depagedPages.size() >= 10 || i == minPage) {
+            finishCleanup(depagedPages);
+            depagedPages.clear();
+         }
       }
    }
 
@@ -376,8 +380,12 @@ public class PageCursorProviderImpl implements PageCursorProvider {
                      Page page = pagingStore.removePage(pageID.intValue());
                      logger.debug("Removing page {}", pageID);
                      if (page != null) {
-                        depagedPages.add(page);
                         depagedPagesSet.add(page.getPageId());
+                        depagedPages.add(page);
+                        if (depagedPages.size() >= 10) {
+                           finishCleanup(depagedPages);
+                           depagedPages.clear();
+                        }
                      }
                   }
                }
