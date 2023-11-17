@@ -51,6 +51,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServers;
 import org.apache.activemq.artemis.core.server.ComponentConfigurationRoutingType;
 import org.apache.activemq.artemis.core.server.Divert;
 import org.apache.activemq.artemis.core.server.impl.ActiveMQServerImpl;
+import org.apache.activemq.artemis.core.server.impl.QueueManagerImpl;
 import org.apache.activemq.artemis.core.server.impl.ServiceRegistryImpl;
 import org.apache.activemq.artemis.core.server.transformer.Transformer;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
@@ -58,6 +59,7 @@ import org.apache.activemq.artemis.core.settings.impl.DeletionPolicy;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.tests.util.CFUtil;
 import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.tests.util.Wait;
 import org.apache.activemq.command.ActiveMQTopic;
 import org.junit.Assert;
 import org.junit.Test;
@@ -1740,6 +1742,130 @@ public class DivertTest extends ActiveMQTestBase {
 
       server.destroyDivert(SimpleString.toSimpleString(DIVERT));
       assertNull(serviceRegistry.getDivertTransformer(DIVERT, null));
+   }
+
+   @Test
+   public void testDivertToNewAddress() throws Exception {
+      final String queueName = "queue";
+      final String propKey = "newQueue";
+      final String DIVERT = "myDivert";
+
+      ServiceRegistryImpl serviceRegistry = new ServiceRegistryImpl();
+      Transformer transformer = new Transformer() {
+         @Override
+         public Message transform(Message message) {
+            return message.setAddress(message.getStringProperty(propKey));
+         }
+      };
+
+      serviceRegistry.addDivertTransformer(DIVERT, transformer);
+
+      ActiveMQServer server = addServer(new ActiveMQServerImpl(createDefaultInVMConfig(), null, null, null, serviceRegistry));
+      server.start();
+      server.waitForActivation(100, TimeUnit.MILLISECONDS);
+
+      AddressSettings addressSettings = new AddressSettings().setAutoCreateAddresses(true).setAutoCreateQueues(true);
+      server.getConfiguration().addAddressSetting("#", addressSettings);
+      server.createQueue(new QueueConfiguration(queueName));
+      server.deployDivert(new DivertConfiguration()
+                             .setName(DIVERT)
+                             .setAddress(queueName)
+                             .setRoutingType(ComponentConfigurationRoutingType.ANYCAST)
+                             .setForwardingAddress("Dummy")
+                             .setExclusive(true));
+
+      ServerLocator locator = createInVMNonHALocator();
+      ClientSessionFactory sf = createSessionFactory(locator);
+      ClientSession session = sf.createSession(false, true, true);
+      session.start();
+      ClientProducer producer = session.createProducer(queueName);
+
+      final int numMessages = 10;
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientMessage message = session.createMessage(true);
+         message.setRoutingType(RoutingType.ANYCAST);
+         message.putStringProperty(propKey, queueName + i);
+         producer.send(message);
+      }
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientConsumer consumer = session.createConsumer(queueName + i);
+         ClientMessage message = consumer.receive(DivertTest.TIMEOUT);
+         Assert.assertNotNull(message);
+         message.acknowledge();
+         consumer.close();
+      }
+   }
+
+   @Test
+   public void testHandleQueueAutoDelete() throws Exception {
+      final String testAddress = "testAddress";
+      final String forwardAddress = "forwardAddress";
+
+      DivertConfiguration divertConf = new DivertConfiguration()
+         .setName("divert1")
+         .setRoutingType(ComponentConfigurationRoutingType.ANYCAST)
+         .setExclusive(true)
+         .setAddress(testAddress)
+         .setForwardingAddress(forwardAddress);
+
+      AddressSettings addressSettings = new AddressSettings()
+         .setAutoCreateAddresses(true)
+         .setAutoCreateQueues(true)
+         .setAutoDeleteAddresses(true)
+         .setAutoDeleteQueues(true);
+
+      Configuration config = createDefaultInVMConfig().addDivertConfiguration(divertConf).addAddressSetting("#", addressSettings);
+      ActiveMQServer server = addServer(ActiveMQServers.newActiveMQServer(config, false));
+      server.start();
+
+      ServerLocator locator = createInVMNonHALocator();
+
+      ClientSessionFactory sf = createSessionFactory(locator);
+      ClientSession session = sf.createSession(false, true, true);
+
+      session.createQueue(new QueueConfiguration(testAddress).setAddress(testAddress).setRoutingType(RoutingType.ANYCAST).setDurable(true));
+      session.createQueue(new QueueConfiguration(forwardAddress).setAddress(forwardAddress).setRoutingType(RoutingType.ANYCAST).setDurable(true));
+      session.start();
+
+      ClientProducer producer = session.createProducer(new SimpleString(testAddress));
+      ClientConsumer consumer = session.createConsumer(forwardAddress);
+
+      final int numMessages = 5;
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientMessage message = session.createMessage(true);
+         message.setRoutingType(RoutingType.ANYCAST);
+         producer.send(message);
+      }
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientMessage message = consumer.receive(DivertTest.TIMEOUT);
+         Assert.assertNotNull(message);
+         message.acknowledge();
+      }
+      Assert.assertNull(consumer.receiveImmediate());
+      consumer.close();
+
+      //Trigger autoDelete instead of waiting
+      QueueManagerImpl.performAutoDeleteQueue(server, server.locateQueue(forwardAddress));
+      Wait.assertTrue(() -> server.getPostOffice().getAddressInfo(SimpleString.toSimpleString(forwardAddress)).getBindingRemovedTimestamp() != -1, TIMEOUT, 100);
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientMessage message = session.createMessage(true);
+         message.setRoutingType(RoutingType.ANYCAST);
+         producer.send(message);
+      }
+
+      consumer = session.createConsumer(forwardAddress);
+
+      for (int i = 0; i < numMessages; i++) {
+         ClientMessage message = consumer.receive(DivertTest.TIMEOUT);
+         Assert.assertNotNull(message);
+         message.acknowledge();
+      }
+      Assert.assertNull(consumer.receiveImmediate());
    }
 
    @Test
