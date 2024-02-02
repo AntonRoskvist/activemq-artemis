@@ -353,6 +353,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
    private static final String ID_CACHE_SIZE = "id-cache-size";
 
+   private static final String AUTO_CREATE_DIVERT_DESTINATION_NODE_NAME = "auto-create-divert-destination";
+
    private boolean validateAIO = false;
 
    private boolean printPageMaxSizeUsed = false;
@@ -1481,6 +1483,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
             int idCacheSize = XMLUtil.parseInt(child);
             Validators.GE_ZERO.validate(ID_CACHE_SIZE, idCacheSize);
             addressSettings.setIDCacheSize(XMLUtil.parseInt(child));
+         } else if (AUTO_CREATE_DIVERT_DESTINATION_NODE_NAME.equalsIgnoreCase(name)) {
+            addressSettings.setAutoCreateDivertDestination(XMLUtil.parseBoolean(child));
          }
       }
       return setting;

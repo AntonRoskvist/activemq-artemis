@@ -1764,8 +1764,13 @@ public class DivertTest extends ActiveMQTestBase {
       server.start();
       server.waitForActivation(100, TimeUnit.MILLISECONDS);
 
-      AddressSettings addressSettings = new AddressSettings().setAutoCreateAddresses(true).setAutoCreateQueues(true);
+      AddressSettings addressSettings = new AddressSettings()
+         .setAutoCreateAddresses(true)
+         .setAutoCreateQueues(true)
+         .setAutoCreateDivertDestination(true);
+
       server.getConfiguration().addAddressSetting("#", addressSettings);
+      server.getAddressSettingsRepository().addMatch("#", addressSettings);
       server.createQueue(new QueueConfiguration(queueName));
       server.deployDivert(new DivertConfiguration()
                              .setName(DIVERT)

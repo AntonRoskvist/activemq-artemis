@@ -143,6 +143,8 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
 
    public static final boolean DEFAULT_ENABLE_INGRESS_TIMESTAMP = false;
 
+   public static final boolean DEFAULT_AUTO_CREATE_DIVERT_DESTINATIONS = false;
+
    private AddressFullMessagePolicy addressFullMessagePolicy = null;
 
    private Long maxSizeBytes = null;
@@ -299,6 +301,8 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
 
    private Integer idCacheSize = null;
 
+   private Boolean autoCreateDivertDestination = null;
+
    //from amq5
    //make it transient
    private transient Integer queuePrefetch = null;
@@ -377,6 +381,7 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       this.slowConsumerThresholdMeasurementUnit = other.slowConsumerThresholdMeasurementUnit;
       this.enableIngressTimestamp = other.enableIngressTimestamp;
       this.idCacheSize = other.idCacheSize;
+      this.autoCreateDivertDestination = other.autoCreateDivertDestination;
    }
 
    public AddressSettings() {
@@ -1108,6 +1113,15 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       return this;
    }
 
+   public boolean isAutoCreateDivertDestination() {
+      return autoCreateDivertDestination != null ? autoCreateDivertDestination : AddressSettings.DEFAULT_AUTO_CREATE_DIVERT_DESTINATIONS;
+   }
+
+   public AddressSettings setAutoCreateDivertDestination(final boolean autoCreateDivertDestination) {
+      this.autoCreateDivertDestination = autoCreateDivertDestination;
+      return this;
+   }
+
    /**
     * merge 2 objects in to 1
     *
@@ -1345,6 +1359,9 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       }
       if (prefetchPageBytes == null) {
          prefetchPageBytes = merged.prefetchPageBytes;
+      }
+      if (autoCreateDivertDestination == null) {
+         autoCreateDivertDestination = merged.autoCreateDivertDestination;
       }
    }
 
@@ -1633,6 +1650,10 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       if (buffer.readableBytes() > 0) {
          prefetchPageMessages = BufferHelper.readNullableInteger(buffer);
       }
+
+      if (buffer.readableBytes() > 0) {
+         autoCreateDivertDestination = BufferHelper.readNullableBoolean(buffer);
+      }
    }
 
    @Override
@@ -1711,7 +1732,8 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
          BufferHelper.sizeOfNullableInteger(idCacheSize) +
          BufferHelper.sizeOfNullableSimpleString(pageFullMessagePolicy != null ? pageFullMessagePolicy.toString() : null) +
          BufferHelper.sizeOfNullableInteger(prefetchPageBytes) +
-         BufferHelper.sizeOfNullableInteger(prefetchPageMessages);
+         BufferHelper.sizeOfNullableInteger(prefetchPageMessages) +
+         BufferHelper.sizeOfNullableBoolean(autoCreateDivertDestination);
    }
 
    @Override
@@ -1867,6 +1889,8 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       BufferHelper.writeNullableInteger(buffer, prefetchPageBytes);
 
       BufferHelper.writeNullableInteger(buffer, prefetchPageMessages);
+
+      BufferHelper.writeNullableBoolean(buffer, autoCreateDivertDestination);
    }
 
    /* (non-Javadoc)
@@ -1951,6 +1975,7 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
       result = prime * result + ((idCacheSize == null) ? 0 : idCacheSize.hashCode());
       result = prime * result + ((prefetchPageBytes == null) ? 0 : prefetchPageBytes.hashCode());
       result = prime * result + ((prefetchPageMessages == null) ? 0 : prefetchPageMessages.hashCode());
+      result = prime * result + ((autoCreateDivertDestination == null) ? 0 : autoCreateDivertDestination.hashCode());
 
       return result;
    }
@@ -2382,6 +2407,14 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
          return false;
       }
 
+      if (autoCreateDivertDestination == null) {
+         if (other.autoCreateDivertDestination != null) {
+            return false;
+         }
+      } else if (!autoCreateDivertDestination.equals(other.autoCreateDivertDestination)) {
+         return false;
+      }
+
       return true;
    }
 
@@ -2535,6 +2568,8 @@ public class AddressSettings implements Mergeable<AddressSettings>, Serializable
          prefetchPageMessages +
          ", prefetchPageBytes=" +
          prefetchPageBytes +
+         ", autoCreateDivertDestination=" +
+         autoCreateDivertDestination +
          "]";
    }
 }

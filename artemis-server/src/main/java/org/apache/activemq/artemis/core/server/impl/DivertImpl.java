@@ -29,6 +29,8 @@ import org.apache.activemq.artemis.core.server.ComponentConfigurationRoutingType
 import org.apache.activemq.artemis.core.server.Divert;
 import org.apache.activemq.artemis.core.server.RoutingContext;
 import org.apache.activemq.artemis.core.server.transformer.Transformer;
+import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
+import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.lang.invoke.MethodHandles;
@@ -141,12 +143,23 @@ public class DivertImpl implements Divert {
             copy.reencode();
 
             // Make sure new destination exists else create if possible
-            AutoCreateResult autoCreateResult = context.getServerSession().checkAutoCreate(new QueueConfiguration(copy.getAddress())
-                                                                                              .setRoutingType(copy.getRoutingType())
-                                                                                              .setDurable(copy.isDurable()));
-            if (autoCreateResult == AutoCreateResult.NOT_FOUND) {
-               throw ActiveMQMessageBundle.BUNDLE.noSuchQueue(copy.getAddressSimpleString());
+            if (!forwardAddress.equals(copy.getAddressSimpleString())) {
+
+               AddressSettings settings = postOffice.getAddressSettingsMatch(copy.getAddress());
+
+               if (settings.isAutoCreateDivertDestination() && copy.getRoutingType() != null) {
+                  AutoCreateResult autoCreateResult = context.getServerSession().checkAutoCreate(
+                     new QueueConfiguration(copy.getAddress())
+                        .setRoutingType(copy.getRoutingType())
+                        .setDurable(copy.isDurable()));
+
+                  if (autoCreateResult == AutoCreateResult.NOT_FOUND) {
+                     throw ActiveMQMessageBundle.BUNDLE.noSuchQueue(copy.getAddressSimpleString());
+                  }
+               }
+
             }
+
          } else {
             copy = message;
          }
