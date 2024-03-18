@@ -17,6 +17,7 @@
 package org.apache.activemq.artemis.tests.integration.cluster.distribution;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -26,12 +27,14 @@ import org.apache.activemq.artemis.api.core.client.ClientMessage;
 import org.apache.activemq.artemis.api.core.client.ClientProducer;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
+import org.apache.activemq.artemis.api.core.management.QueueControl;
 import org.apache.activemq.artemis.core.postoffice.Binding;
 import org.apache.activemq.artemis.core.server.cluster.ClusterConnection;
 import org.apache.activemq.artemis.core.server.cluster.MessageFlowRecord;
 import org.apache.activemq.artemis.core.server.cluster.RemoteQueueBinding;
 import org.apache.activemq.artemis.core.server.cluster.impl.ClusterConnectionImpl;
 import org.apache.activemq.artemis.core.server.cluster.impl.MessageLoadBalancingType;
+import org.apache.activemq.artemis.tests.integration.management.ManagementControlHelper;
 import org.apache.activemq.artemis.tests.util.Wait;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -546,4 +549,92 @@ public class SimpleSymmetricClusterTest extends ClusterTestBase {
 
    }
 
+   @Test
+   public void testSimpleSnFManagement() throws Exception {
+      final String address = "queues.testaddress";
+      final String queue = "queue0";
+
+      setupServer(0, true, isNetty());
+      setupServer(1, true, isNetty());
+
+      setupClusterConnection("cluster0", "queues", MessageLoadBalancingType.ON_DEMAND, 1, isNetty(), 0, 1);
+      setupClusterConnection("cluster1", "queues", MessageLoadBalancingType.ON_DEMAND, 1, isNetty(), 1, 0);
+
+      startServers(0, 1);
+
+      setupSessionFactory(0, isNetty());
+      setupSessionFactory(1, isNetty());
+
+      createQueue(0, address, queue, null, true);
+      createQueue(1, address, queue, null, true);
+
+      addConsumer(0, 0, queue, null);
+      addConsumer(1, 1, queue, null);
+
+      waitForBindings(0, address, 1, 1, true);
+      waitForBindings(1, address, 1, 1, true);
+
+      waitForBindings(0, address, 1, 1, false);
+      waitForBindings(1, address, 1, 1, false);
+
+      SimpleString queueNameSnF = SimpleString.toSimpleString(
+         Arrays.stream(servers[0].getActiveMQServerControl().getQueueNames()).filter(
+               queueName -> queueName.contains(servers[0].getInternalNamingPrefix()))
+            .findFirst()
+            .orElse(null));
+
+      SimpleString queueNameNotifications = SimpleString.toSimpleString(
+         Arrays.stream(servers[0].getActiveMQServerControl().getQueueNames()).filter(
+               queueName -> queueName.startsWith("notif."))
+            .findFirst()
+            .orElse(null));
+
+      Assert.assertNotNull(queueNameSnF);
+      Assert.assertNotNull(queueNameNotifications);
+
+      QueueControl queueControlSnF = ManagementControlHelper.createQueueControl(queueNameSnF, queueNameSnF, RoutingType.MULTICAST, servers[0].getMBeanServer());
+      QueueControl queueControlNotifications = ManagementControlHelper.createQueueControl(servers[0].getConfiguration().getManagementNotificationAddress(), queueNameNotifications, RoutingType.MULTICAST, servers[0].getMBeanServer());
+
+      //check that internal and notifications queues can be managed
+      queueControlSnF.pause();
+      queueControlNotifications.pause();
+      Assert.assertTrue(queueControlSnF.isPaused());
+      Assert.assertTrue(queueControlNotifications.isPaused());
+
+      queueControlSnF.resume();
+      queueControlNotifications.resume();
+      Assert.assertFalse(queueControlSnF.isPaused());
+      Assert.assertFalse(queueControlNotifications.isPaused());
+
+      closeAllConsumers();
+
+      servers[0].stop();
+      waitForServerToStop(servers[0]);
+      servers[0].start();
+      waitForServerToStart(servers[0]);
+      waitForTopology(servers[0], 2);
+      Thread.sleep(1000);
+
+      queueNameNotifications = SimpleString.toSimpleString(
+         Arrays.stream(servers[0].getActiveMQServerControl().getQueueNames()).filter(
+               queueName -> queueName.startsWith("notif."))
+            .findFirst()
+            .orElse(null));
+
+      Assert.assertNotNull(queueNameNotifications);
+
+      queueControlSnF = ManagementControlHelper.createQueueControl(queueNameSnF, queueNameSnF, RoutingType.MULTICAST, servers[0].getMBeanServer());
+      queueControlNotifications = ManagementControlHelper.createQueueControl(servers[0].getConfiguration().getManagementNotificationAddress(), queueNameNotifications, RoutingType.MULTICAST, servers[0].getMBeanServer());
+
+      //check that internal queue can be managed
+      queueControlSnF.pause();
+      queueControlNotifications.pause();
+      Assert.assertTrue(queueControlSnF.isPaused());
+      Assert.assertTrue(queueControlNotifications.isPaused());
+
+      queueControlSnF.resume();
+      queueControlNotifications.resume();
+      Assert.assertFalse(queueControlSnF.isPaused());
+      Assert.assertFalse(queueControlNotifications.isPaused());
+   }
 }

@@ -809,6 +809,13 @@ public final class ClusterConnectionImpl implements ClusterConnection, AfterConn
                // such as we don't hold groupIDs inside the SnF queue
                queue.setInternalQueue(true);
 
+               try {
+                  managementService.registerAddress(server.getAddressInfo(queueName));
+                  server.registerQueueOnManagement(queue, true);
+               } catch (Throwable ignored) {
+                  logger.debug(ignored.getMessage(), ignored);
+               }
+
                createNewRecord(topologyMember.getUniqueEventID(), nodeID, topologyMember.getPrimary(), queueName, queue, true);
             } else {
                if (logger.isTraceEnabled()) {

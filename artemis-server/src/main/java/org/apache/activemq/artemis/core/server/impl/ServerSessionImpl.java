@@ -782,6 +782,15 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
          tempQueueCleannerUppers.put(queueConfiguration.getName(), cleaner);
       }
 
+      if (queueConfiguration.getAddress().equals(server.getConfiguration().getManagementNotificationAddress())) {
+         try {
+            managementService.registerAddress(server.getAddressInfo(queueConfiguration.getAddress()));
+            server.registerQueueOnManagement(queue, true);
+         } catch (Throwable ignored) {
+            logger.debug(ignored.getMessage(), ignored);
+         }
+      }
+
       if (logger.isDebugEnabled()) {
          logger.debug("Queue {} created on address {} with filter={} temporary = {} durable={} on session user={}, connection={}",
                queueConfiguration.getName(), queueConfiguration.getAddress(), queueConfiguration.getFilterString(),

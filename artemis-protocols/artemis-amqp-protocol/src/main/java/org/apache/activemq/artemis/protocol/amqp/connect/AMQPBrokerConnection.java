@@ -509,6 +509,7 @@ public class AMQPBrokerConnection implements ClientConnectionLifeCycleListener, 
       }
 
       try {
+         server.getManagementService().registerAddress(addressInfo);
          server.registerQueueOnManagement(mirrorControlQueue, true);
       } catch (Throwable ignored) {
          logger.debug(ignored.getMessage(), ignored);
