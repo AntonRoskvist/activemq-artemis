@@ -23,6 +23,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.group.ChannelGroup;
+import org.apache.activemq.artemis.api.core.ActiveMQException;
+import org.apache.activemq.artemis.core.client.ActiveMQClientLogger;
 import org.apache.activemq.artemis.protocol.amqp.proton.handler.ProtonHandler;
 import org.apache.activemq.artemis.spi.core.remoting.ClientConnectionLifeCycleListener;
 
@@ -83,4 +85,30 @@ public class AMQPBrokerConnectionChannelHandler extends ChannelDuplexHandler {
          buffer.release();
       }
    }
+
+   //Don't know if this belongs here but addresses a Netty WARN:
+   //WARN  [io.netty.channel.DefaultChannelPipeline] An exceptionCaught() event was fired, and it reached at the tail of the pipeline. It usually means the last handler in the pipeline did not handle the exception.
+   //Copied from the CORE equivalent
+   @Override
+   public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) throws Exception {
+      if (!active) {
+         return;
+      }
+      // We don't want to log this - since it is normal for this to happen during failover/reconnect
+      // and we don't want to spew out stack traces in that event
+      // The user has access to this exeception anyway via the ActiveMQException initial cause
+
+      ActiveMQException me = new ActiveMQException(cause.getMessage());
+      me.initCause(cause);
+
+      synchronized (listener) {
+         try {
+            listenerExecutor.execute(() -> listener.connectionException(channelId(ctx.channel()), me));
+            active = false;
+         } catch (Exception ex) {
+            ActiveMQClientLogger.LOGGER.errorCallingLifeCycleListener(ex);
+         }
+      }
+   }
+
 }
