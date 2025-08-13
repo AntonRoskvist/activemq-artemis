@@ -652,7 +652,9 @@ public class FederatedAddressTest extends FederatedTestBase {
 
    @Test
    public void testUpstreamFederatedAddressWithCompressedMessage() throws Exception {
-      final String DATA = RandomUtil.randomAlphaNumericString(1024 * 1024);
+      final String DATA_REGULAR = RandomUtil.randomAlphaNumericString(10);
+      final String DATA_COMPRESSED_REGULAR = "Compresses easily".repeat(500 * 1024);
+      final String DATA_COMPRESSED_LARGE = RandomUtil.randomAlphaNumericString(1024 * 1024);
       final String address = getName();
 
       FederationConfiguration federationConfiguration = FederatedTestUtil.createAddressUpstreamFederationConfiguration("server1", address);
@@ -681,15 +683,33 @@ public class FederatedAddressTest extends FederatedTestBase {
          MessageConsumer consumer1 = session1.createConsumer(topic1);
 
          MessageProducer producer = session0.createProducer(topic0);
-         producer.send(session0.createTextMessage(DATA));
 
-         TextMessage message0 = (TextMessage) consumer0.receive(1000);
+         TextMessage message0;
+         TextMessage message1;
+
+         producer.send(session0.createTextMessage(DATA_REGULAR));
+         message0 = (TextMessage) consumer0.receive(1000);
+         message1 = (TextMessage) consumer1.receive(1000);
          assertNotNull(message0);
-         assertEquals(DATA, message0.getText());
-
-         TextMessage message1 = (TextMessage) consumer1.receive(1000);
          assertNotNull(message1);
-         assertEquals(DATA, message1.getText());
+         assertEquals(DATA_REGULAR, message0.getText());
+         assertEquals(DATA_REGULAR, message1.getText());
+
+         producer.send(session0.createTextMessage(DATA_COMPRESSED_LARGE));
+         message0 = (TextMessage) consumer0.receive(1000);
+         message1 = (TextMessage) consumer1.receive(1000);
+         assertNotNull(message0);
+         assertNotNull(message1);
+         assertEquals(DATA_COMPRESSED_LARGE, message0.getText());
+         assertEquals(DATA_COMPRESSED_LARGE, message1.getText());
+
+         producer.send(session0.createTextMessage(DATA_COMPRESSED_REGULAR));
+         message0 = (TextMessage) consumer0.receive(1000);
+         message1 = (TextMessage) consumer1.receive(1000);
+         assertNotNull(message0);
+         assertNotNull(message1);
+         assertEquals(DATA_COMPRESSED_REGULAR, message0.getText());
+         assertEquals(DATA_COMPRESSED_REGULAR, message1.getText());
 
       }
    }
