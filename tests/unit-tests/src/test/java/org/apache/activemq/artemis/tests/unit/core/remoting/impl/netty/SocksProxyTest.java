@@ -38,7 +38,9 @@ import java.util.concurrent.TimeUnit;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.proxy.Socks5ProxyHandler;
@@ -66,8 +68,8 @@ public class SocksProxyTest extends ActiveMQTestBase {
    private ExecutorService threadPool;
    private ScheduledExecutorService scheduledThreadPool;
 
-   private NioEventLoopGroup bossGroup;
-   private NioEventLoopGroup workerGroup;
+   private EventLoopGroup bossGroup;
+   private EventLoopGroup workerGroup;
 
    @Override
    @BeforeEach
@@ -264,8 +266,8 @@ public class SocksProxyTest extends ActiveMQTestBase {
    }
 
    private void startSocksProxy() throws Exception {
-      bossGroup   = new NioEventLoopGroup();
-      workerGroup = new NioEventLoopGroup();
+      bossGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
+      workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
 
       ServerBootstrap b = new ServerBootstrap();
       b.group(bossGroup, workerGroup);
